@@ -180,5 +180,22 @@ function attemptReconnect() {
     }
 }
 
+// Cleanup Interval
+setInterval(() => {
+    const now = new Date();
+    const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+    for (const [code, data] of transponders.entries()) {
+        if (now - data.lastPassingTime > TIMEOUT_MS) {
+            console.log(`Removing inactive transponder: ${code}`);
+            transponders.delete(code);
+            const item = document.getElementById(`transponder-${code}`);
+            if (item) {
+                item.remove();
+            }
+        }
+    }
+}, 60 * 1000); // Run every minute
+
 // Start
 connect();
