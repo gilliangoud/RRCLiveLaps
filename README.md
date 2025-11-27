@@ -1,7 +1,9 @@
 # RRCLiveLaps
 A simple web page showing live local lap times from a Race|Result decoder.
 
-![RRCLiveLaps Screenshot](docs/screenshot.png)
+![RRCLiveLaps unconnected](unconnected.jpeg)
+
+![RRCLiveLaps running](running.jpeg)
 
 
 ## Installation
