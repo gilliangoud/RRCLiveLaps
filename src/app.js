@@ -42,6 +42,20 @@ function updateTransponder(data) {
 
     let lapTime = null;
 
+    // Handle Impulse Marker (Start Signal)
+    if (code === "00000127") {
+        console.log("Impulse Marker received at:", passingTime);
+        // Update all existing transponders' lastPassingTime to this marker time
+        // This effectively resets their lap start time
+        for (const [tCode, tData] of transponders.entries()) {
+            tData.lastPassingTime = passingTime;
+            // Optionally clear their current lap time display or keep it until next passing?
+            // "we know their lap time from the start signal" implies the NEXT passing will be diff against this marker.
+            // So we just update the reference time.
+        }
+        return; // Do not display the marker itself
+    }
+
     // Hide title if visible
     const title = document.querySelector('h1');
     if (title && title.style.display !== 'none') {
