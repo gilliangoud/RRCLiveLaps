@@ -2,13 +2,37 @@
 const WS_URL = 'ws://localhost:8080/ws';
 
 // State
-const transponders = new Map(); // code -> { lastPassingTime: Date, lastLapTime: string }
+const transponders = new Map(); // code -> { lastPassingTime: Date, lastLapTime: string, lapCount: number }
+const transponderNames = new Map(); // code -> name
 let ws = null;
 let reconnectInterval = null;
 
 // DOM Elements
 const statusIndicator = document.getElementById('status-indicator');
 const transponderList = document.getElementById('transponder-list');
+const mappingFileInput = document.getElementById('mapping-file');
+
+// Load Mapping on Start
+window.addEventListener('load', () => {
+    fetch('mapping.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(mapping => {
+            transponderNames.clear();
+            Object.entries(mapping).forEach(([code, name]) => {
+                transponderNames.set(code, name);
+            });
+            console.log('Loaded mapping:', transponderNames);
+        })
+        .catch(err => {
+            console.error('Error loading mapping.json:', err);
+            // Non-blocking, just no names will be shown
+        });
+});
 
 // Status Management
 const Status = {
@@ -46,12 +70,11 @@ function updateTransponder(data) {
     if (code === "00000127") {
         console.log("Impulse Marker received at:", passingTime);
         // Update all existing transponders' lastPassingTime to this marker time
-        // This effectively resets their lap start time
         for (const [tCode, tData] of transponders.entries()) {
             tData.lastPassingTime = passingTime;
-            // Optionally clear their current lap time display or keep it until next passing?
-            // "we know their lap time from the start signal" implies the NEXT passing will be diff against this marker.
-            // So we just update the reference time.
+            // Reset lap counts on start signal? Usually yes for a new race, 
+            // but let's keep it simple: just sync time.
+            // If user wants reset, they can refresh page.
         }
         return; // Do not display the marker itself
     }
@@ -69,11 +92,15 @@ function updateTransponder(data) {
         // Lower debounce to 500ms to allow fast laps (mock decoder is 1s)
         if (diff > 500) {
             lapTime = formatTime(diff);
+            // Increment lap count
+            const newLapCount = (lastData.lapCount || 0) + 1;
+
             transponders.set(code, {
                 lastPassingTime: passingTime,
-                lastLapTime: lapTime
+                lastLapTime: lapTime,
+                lapCount: newLapCount
             });
-            updateDOM(code, lapTime);
+            updateDOM(code, lapTime, newLapCount);
         } else {
             transponders.get(code).lastPassingTime = passingTime;
         }
@@ -81,27 +108,58 @@ function updateTransponder(data) {
         // First passing
         transponders.set(code, {
             lastPassingTime: passingTime,
-            lastLapTime: '0.00'
+            lastLapTime: '0.00',
+            lapCount: 0 // Start at 0 or 1? Usually 0 completed laps if this is start line interaction? 
+            // Or if it's first detection. Let's say 0 laps completed (waiting for first full lap).
+            // Or is this a finish line passing? If 0, then 1st lap starts.
         });
-        updateDOM(code, '0.00');
+        updateDOM(code, '0.00', 0);
     }
 }
 
-function updateDOM(code, lapTime) {
+function updateDOM(code, lapTime, lapCount) {
     let item = document.getElementById(`transponder-${code}`);
+    const name = transponderNames.get(code) || code;
+    // For display, if mapped, show Name. If not, show Code.
+    // We will show the Code smaller if Name is present, or just Name if we want cleaner UI.
+    // User asked for "transponder id stacked vertically".
+    // Let's show:
+    // [Name]
+    // [Code] (small)
+    // [Laps: X]
+
+    // Construct HTML for the Info block
+    let infoHTML = '';
+    if (transponderNames.has(code)) {
+        infoHTML = `
+            <div class="transponder-name">${name}</div>
+            <div class="transponder-code-small">${code}</div>
+            <div class="lap-info">Laps: ${lapCount}</div>
+        `;
+    } else {
+        infoHTML = `
+            <div class="transponder-name">${code}</div>
+            <div class="lap-info">Laps: ${lapCount}</div>
+        `;
+    }
 
     if (!item) {
         item = document.createElement('div');
         item.id = `transponder-${code}`;
         item.className = 'transponder-item';
         item.innerHTML = `
-            <span class="transponder-code">${code}</span>
-            <span class="lap-time">${lapTime}</span>
+            <div class="transponder-info">
+                ${infoHTML}
+            </div>
+            <div class="lap-time">${lapTime}</div>
         `;
         // New item goes to top
         transponderList.prepend(item);
     } else {
+        const infoEl = item.querySelector('.transponder-info');
         const timeEl = item.querySelector('.lap-time');
+
+        infoEl.innerHTML = infoHTML;
         timeEl.textContent = lapTime;
 
         // Move to top
@@ -113,10 +171,10 @@ function updateDOM(code, lapTime) {
             item.style.backgroundColor = '#2d2d2d';
         }, 200);
     }
-
-    // Sort list by most recent activity (optional, but nice)
-    // For now, we just append or update in place.
 }
+// Sort list by most recent activity (optional, but nice)
+// For now, we just append or update in place.
+
 
 // WebSocket Connection
 function connect() {

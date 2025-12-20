@@ -41,11 +41,29 @@ h1 {
     background-color: #3d3d3d;
 }
 
-.transponder-code {
-    font-size: 10cqw;
+.transponder-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.transponder-name {
+    font-size: 8cqw;
     font-weight: bold;
+    color: #ffffff;
+}
+
+.transponder-code-small {
+    font-size: 4cqw;
+    color: #a0a0a0;
+    margin-top: 5px;
+}
+
+.lap-info {
+    font-size: 6cqw;
     color: #e0e0e0;
-    flex-shrink: 0;
+    margin-top: 10px;
 }
 
 .lap-time {

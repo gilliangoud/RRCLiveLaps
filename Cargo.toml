@@ -1,0 +1,11 @@
+[package]
+name = "rrclivelaps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+warp = "0.3"
+rust-embed = "8.0"
+webbrowser = "0.8"
+mime_guess = "2.0"
