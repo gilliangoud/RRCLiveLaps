@@ -12,6 +12,24 @@ async fn main() {
         let path = tail.as_str();
         let asset_path = if path == "" { "index.html" } else { path };
 
+        // Logic:
+        // 1. If asking for `mapping.json`, check if it exists in current working directory.
+        // 2. If yes, serve that.
+        // 3. Else, serve from embedded assets.
+
+        if asset_path == "mapping.json" && std::path::Path::new("mapping.json").exists() {
+             match std::fs::read("mapping.json") {
+                Ok(content) => {
+                     println!("Serving external mapping.json");
+                     return warp::http::Response::builder()
+                        .header("content-type", "application/json")
+                        .body(content)
+                        .unwrap_or_else(|_| warp::http::Response::new(vec![]));
+                },
+                Err(e) => eprintln!("Failed to read local mapping.json: {}", e),
+             }
+        }
+
         match Asset::get(asset_path) {
             Some(content) => {
                 let mime = mime_guess::from_path(asset_path).first_or_octet_stream();
