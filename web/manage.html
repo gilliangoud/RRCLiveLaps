@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Mappings - RRLiveLaps</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #2d2d2d;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background-color: #3d3d3d;
+            color: white;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button.primary {
+            background-color: #007aff;
+            color: white;
+        }
+
+        button.primary:hover {
+            background-color: #0062cc;
+        }
+
+        button.danger {
+            background-color: #ff3b30;
+            color: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #444;
+        }
+
+        th {
+            color: #888;
+            font-weight: normal;
+            font-size: 14px;
+        }
+
+        td {
+            font-size: 16px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .edit-btn {
+            background-color: #555;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .delete-btn {
+            background-color: #3a1a1a;
+            color: #ff3b30;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+        }
+
+        .status.success {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+        }
+
+        .status.error {
+            background-color: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+        }
+
+        .nav-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #888;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .nav-link:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <a href="/" class="nav-link">← Back to Live Laps</a>
+        <h1>Manage Transponders</h1>
+
+        <div class="form-group">
+            <input type="text" id="transponderId" placeholder="Transponder ID (e.g. 0000001)">
+            <input type="text" id="driverName" placeholder="Driver Name">
+            <button class="primary" onclick="addEntry()">Add</button>
+        </div>
+
+        <div style="margin-top: 40px; border-top: 1px solid #444; padding-top: 20px;">
+            <h2>Server Configuration</h2>
+            <div class="form-group" style="flex-direction: column;">
+                <label style="color: #888; font-size: 14px;">Operation Mode</label>
+                <select id="appMode" onchange="toggleSettings()"
+                    style="padding: 10px; background: #3d3d3d; color: white; border: 1px solid #444; border-radius: 8px;">
+                    <option value="tcp">Direct Network (TCP)</option>
+                    <option value="usb">USB Connection</option>
+                    <option value="tcp_server">TCP Server (JSON)</option>
+                </select>
+            </div>
+
+            <div id="tcpSettings" class="form-group">
+                <input type="text" id="tcpHost" placeholder="Host (e.g. 192.168.1.50)">
+                <input type="number" id="tcpPort" placeholder="Port (e.g. 3601)">
+            </div>
+
+            <div id="usbSettings" class="form-group" style="display: none;">
+                <input type="text" id="usbPortPath" placeholder="USB Port (e.g. /dev/ttyUSB0 or COM3)">
+            </div>
+
+            <div id="tcpServerSettings" class="form-group" style="display: none;">
+                <input type="number" id="listenPort" placeholder="Listen Port (default 3602)">
+            </div>
+
+            <div style="text-align: right;">
+                <button class="primary" style="background-color: #ff9500;" onclick="saveConfig()">Save Settings &
+                    Restart</button>
+            </div>
+        </div>
+
+        <table id="mappingTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th style="text-align: right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be injected here -->
+            </tbody>
+        </table>
+
+        <div style="margin-top: 30px; text-align: right;">
+            <button class="primary" style="background-color: #28a745;" onclick="saveMapping()">Save Changes to
+                Disk</button>
+        </div>
+
+        <div id="statusMessage" class="status"></div>
+    </div>
+
+    <script>
+        let mapping = {};
+        let config = {};
+
+        // Load initial data
+        window.onload = async () => {
+            await loadMapping();
+            await loadConfig();
+        };
+
+        async function loadMapping() {
+            try {
+                const response = await fetch('mapping.json');
+                if (response.ok) {
+                    mapping = await response.json();
+                    renderTable();
+                }
+            } catch (e) { console.error("Could not load mapping.json", e); }
+        }
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    config = await response.json();
+
+                    // Populate UI
+                    const modeSelect = document.getElementById('appMode');
+                    if (config.mode.mode === 'tcp') {
+                        modeSelect.value = 'tcp';
+                        document.getElementById('tcpHost').value = config.mode.host;
+                        document.getElementById('tcpPort').value = config.mode.port;
+                    } else if (config.mode.mode === 'usb') {
+                        modeSelect.value = 'usb';
+                        document.getElementById('usbPortPath').value = config.mode.port_path;
+                    } else if (config.mode.mode === 'tcpserver') {
+                        modeSelect.value = 'tcp_server';
+                        document.getElementById('listenPort').value = config.mode.port;
+                    }
+                    toggleSettings();
+                }
+            } catch (e) { console.error("Could not load config", e); }
+        }
+
+        function toggleSettings() {
+            const mode = document.getElementById('appMode').value;
+            // Hide all first
+            document.getElementById('tcpSettings').style.display = 'none';
+            document.getElementById('usbSettings').style.display = 'none';
+            document.getElementById('tcpServerSettings').style.display = 'none';
+
+            if (mode === 'tcp') {
+                document.getElementById('tcpSettings').style.display = 'flex';
+            } else if (mode === 'usb') {
+                document.getElementById('usbSettings').style.display = 'flex';
+            } else if (mode === 'tcp_server') {
+                document.getElementById('tcpServerSettings').style.display = 'flex';
+            }
+        }
+
+        async function saveConfig() {
+            const mode = document.getElementById('appMode').value;
+            let newConfig = {};
+
+            if (mode === 'tcp') {
+                newConfig = {
+                    mode: {
+                        mode: "tcp",
+                        host: document.getElementById('tcpHost').value,
+                        port: parseInt(document.getElementById('tcpPort').value)
+                    }
+                };
+            } else if (mode === 'usb') {
+                newConfig = {
+                    mode: {
+                        mode: "usb",
+                        port_path: document.getElementById('usbPortPath').value
+                    }
+                };
+            } else if (mode === 'tcp_server') {
+                newConfig = {
+                    mode: {
+                        mode: "tcpserver",
+                        port: parseInt(document.getElementById('listenPort').value) || 3602
+                    }
+                };
+            }
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+
+                if (response.ok) {
+                    showStatus('Settings Saved! Server is restarting...', 'success');
+                    setTimeout(() => {
+                        alert("Server has been stopped to apply settings. Please restart the application if it does not automatically.");
+                    }, 1000);
+                } else {
+                    showStatus('Failed to save settings.', 'error');
+                }
+            } catch (e) { showStatus('Error saving config: ' + e.message, 'error'); }
+        }
+
+        function renderTable() {
+            const tbody = document.querySelector('#mappingTable tbody');
+            tbody.innerHTML = '';
+
+            // Sort by ID for tidiness
+            const sortedIds = Object.keys(mapping).sort();
+
+            sortedIds.forEach(id => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td>${id}</td>
+                <td>${mapping[id]}</td>
+                <td class="actions">
+                    <button class="edit-btn" onclick="editEntry('${id}')">Edit</button>
+                    <button class="delete-btn" onclick="deleteEntry('${id}')">Delete</button>
+                </td>
+            `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addEntry() {
+            const idInput = document.getElementById('transponderId');
+            const nameInput = document.getElementById('driverName');
+            const id = idInput.value.trim();
+            const name = nameInput.value.trim();
+
+            if (!id || !name) {
+                showStatus('Please enter both ID and Name', 'error');
+                return;
+            }
+
+            mapping[id] = name;
+            renderTable();
+
+            idInput.value = '';
+            nameInput.value = '';
+            idInput.focus();
+        }
+
+        function deleteEntry(id) {
+            if (confirm(`Remove ${mapping[id]} (${id})?`)) {
+                delete mapping[id];
+                renderTable();
+            }
+        }
+
+        function editEntry(id) {
+            const name = prompt("Enter new name for " + id, mapping[id]);
+            if (name !== null) {
+                mapping[id] = name;
+                renderTable();
+            }
+        }
+
+        async function saveMapping() {
+            try {
+                const response = await fetch('/api/mapping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(mapping)
+                });
+
+                if (response.ok) {
+                    showStatus('Saved successfully!', 'success');
+                } else {
+                    showStatus('Failed to save.', 'error');
+                }
+            } catch (e) {
+                showStatus('Error saving: ' + e.message, 'error');
+            }
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = 'status ' + type;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 3000);
+        }
+    </script>
+
+</body>
+
+</html>
