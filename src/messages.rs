@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "event", content = "data")]
+#[serde(untagged)]
 pub enum WsMessage {
-    #[serde(rename = "passing")]
     Passing(Passing),
-    #[serde(rename = "status")]
     Status { event: String },
 }
 

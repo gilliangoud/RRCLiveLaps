@@ -51,10 +51,20 @@ async fn handle_connection(
     while let Ok(msg) = rx.recv().await {
         if let Ok(json) = serde_json::to_string(&msg) {
             if let Err(e) = ws_tx.send(warp::ws::Message::text(json)).await {
+                // Ignore broken pipe or connection reset errors, as they just mean the client disconnected
+                if is_disconnect_error(&e) {
+                    break;
+                }
                 eprintln!("WebSocket send error: {}", e);
                 break;
             }
         }
     }
     println!("WebSocket client disconnected");
+}
+
+fn is_disconnect_error(e: &warp::Error) -> bool {
+    let msg = e.to_string();
+    // println!("DEBUG: Checking error: '{}'", msg);
+    msg.contains("Broken pipe") || msg.contains("Connection reset") || msg.contains("os error 32") || msg.contains("os error 54")
 }

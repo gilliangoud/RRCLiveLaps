@@ -38,8 +38,14 @@ impl Decoder {
                 println!("Connected to decoder");
                 
                 // Status: Connected
+                println!("Decoder connection established at {}:{}", self.ip, self.port);
                 is_connected.store(true, Ordering::SeqCst);
-                let _ = tx.send(WsMessage::Status { event: "connected".to_string() });
+                let msg = WsMessage::Status { event: "connected".to_string() };
+                if let Err(e) = tx.send(msg) {
+                    eprintln!("Failed to broadcast connected status: {}", e);
+                } else {
+                     println!("Broadcasted 'connected' status to WebSocket");
+                }
 
                 if let Err(e) = self.handle_connection(socket, &tx).await {
                     eprintln!("Connection error: {}", e);
@@ -114,6 +120,9 @@ impl Decoder {
     }
 
     fn process_message(&self, msg: &str, tx: &broadcast::Sender<WsMessage>) {
+        if msg.starts_with("#P") {
+             println!("Received Passing: {}", msg);
+        }
         // println!("Received: {}", msg);
         let parts: Vec<&str> = msg.split(';').collect();
         if parts.is_empty() {
@@ -153,6 +162,8 @@ impl Decoder {
                     
                     if let Err(e) = tx.send(WsMessage::Passing(passing)) {
                         eprintln!("Error broadcasting passing: {}. Original data: {}", e, msg);
+                    } else {
+                        println!("Broadcasted passing {} to WebSocket", passing_number);
                     }
                 } else {
                     eprintln!("Error processing passing: Insufficient data parts. Original data: {}", msg);

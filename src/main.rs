@@ -188,7 +188,7 @@ async fn main() {
     let routes = api.or(ws).or(static_files);
 
     // Bind to port 0 to get a random free port
-    let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
+    let addr: SocketAddr = ([127, 0, 0, 1], 8080).into();
 
     println!("Starting server...");
     let server = warp::serve(routes).bind_with_graceful_shutdown(addr, async move {
